@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import Entry from "@/lib/models/Entry";
+import Progress from "@/lib/models/Progress";
 
 export async function GET(request) {
   try {
@@ -47,6 +48,17 @@ export async function POST(request) {
       mood: mood || "neutral",
       tags: tags || []
     });
+
+    const progress = await Progress.findOne();
+    if (progress) {
+      if (!progress.completedDays.includes(day)) {
+        progress.completedDays.push(day);
+        await progress.save();
+      }
+    } else {
+      await Progress.create({ challengeType: 30, completedDays: [day] });
+    }
+
     return NextResponse.json({ success: true, data: entry }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

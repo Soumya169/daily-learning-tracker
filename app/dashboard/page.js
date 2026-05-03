@@ -80,6 +80,13 @@ export default function Dashboard() {
     <>
       <Navbar />
       <main className="max-w-5xl mx-auto px-4 py-6 md:py-8">
+        {/* Info Banner */}
+        <div className="mb-6 p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-xl">
+          <p className="text-sm text-cyan-200">
+            🚀 <strong>Smart tracking:</strong> Every entry you add automatically syncs with your progress. Your days with logged entries will be marked on the progress tracker.
+          </p>
+        </div>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 md:mb-8">
           <StatCard

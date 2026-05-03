@@ -20,6 +20,7 @@ export default function AddEntry() {
   const [existingTopics, setExistingTopics] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState(null); // 'success' | 'error'
+  const [syncMessage, setSyncMessage] = useState("");
   const [nextDay, setNextDay] = useState(1);
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export default function AddEntry() {
     if (!form.day || !form.topic) return;
     setSubmitting(true);
     setStatus(null);
+    setSyncMessage("");
     try {
       const res = await fetch("/api/entries", {
         method: "POST",
@@ -58,8 +60,9 @@ export default function AddEntry() {
       const data = await res.json();
       if (data.success) {
         setStatus("success");
+        setSyncMessage("Progress synced automatically ✓");
         setForm({ day: "", topic: "", subtopic: "", notes: "", timeSpent: "", difficulty: "medium", mood: "neutral", tags: "", date: new Date().toISOString().split("T")[0] });
-        setTimeout(() => router.push("/"), 1200);
+        setTimeout(() => router.push("/dashboard"), 1500);
       } else {
         setStatus("error");
       }
@@ -239,8 +242,15 @@ export default function AddEntry() {
 
             {/* Status */}
             {status === "success" && (
-              <div className="flex items-center gap-2 text-cyan-200 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl px-4 py-2.5 text-sm">
-                <CheckCircle size={16} /> Entry saved! Redirecting...
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-cyan-200 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl px-4 py-2.5 text-sm">
+                  <CheckCircle size={16} /> Entry saved successfully!
+                </div>
+                {syncMessage && (
+                  <div className="flex items-center gap-2 text-emerald-200 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl px-4 py-2.5 text-sm">
+                    <CheckCircle size={16} /> {syncMessage}
+                  </div>
+                )}
               </div>
             )}
             {status === "error" && (

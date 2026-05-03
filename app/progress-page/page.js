@@ -8,6 +8,7 @@ export default function ProgressPage() {
   const [entries, setEntries] = useState([]);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -16,37 +17,53 @@ export default function ProgressPage() {
 
   async function fetchData() {
     setLoading(true);
-    const [pRes, eRes] = await Promise.all([fetch("/api/progress"), fetch("/api/entries")]);
-    const pData = await pRes.json();
-    const eData = await eRes.json();
-    if (pData.success) setProgress(pData.data);
-    if (eData.success) setEntries(eData.data);
+    setError(null);
+    try {
+      const [pRes, eRes] = await Promise.all([fetch("/api/progress"), fetch("/api/entries")]);
+      const pData = await pRes.json();
+      const eData = await eRes.json();
+      if (pData.success) setProgress(pData.data);
+      if (eData.success) setEntries(eData.data);
+    } catch (err) {
+      setError(err.message || "Unable to load progress data.");
+    }
     setLoading(false);
   }
 
   function toggleDay(day) {
+    setSaved(false);
     const curr = progress.completedDays || [];
     const updated = curr.includes(day) ? curr.filter((d) => d !== day) : [...curr, day];
     setProgress({ ...progress, completedDays: updated });
   }
 
   function setChallenge(type) {
+    setSaved(false);
     setProgress({ ...progress, challengeType: type });
   }
 
   async function saveProgress() {
     setSaving(true);
-    const res = await fetch("/api/progress", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(progress),
-    });
-    const data = await res.json();
-    if (data.success) {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+    setError(null);
+    try {
+      const res = await fetch("/api/progress", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(progress),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+        await fetchData();
+      } else {
+        setError(data.error || "Unable to save progress.");
+      }
+    } catch (err) {
+      setError(err.message || "Unable to save progress.");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   const total = progress.challengeType || 30;
@@ -63,6 +80,13 @@ export default function ProgressPage() {
         <div className="mb-6 md:mb-8">
           <h1 className="text-2xl md:text-3xl font-bold text-slate-100 mb-1">Progress Tracker</h1>
           <p className="text-slate-400 text-xs md:text-sm">Manage your challenge and mark days complete</p>
+        </div>
+
+        {/* Info Banner */}
+        <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+          <p className="text-sm text-emerald-200">
+            ✨ <strong>Auto-sync enabled:</strong> Days with logged entries are automatically tracked. Add new entries from the dashboard to update progress instantly.
+          </p>
         </div>
 
         {/* Challenge Selector */}
@@ -107,8 +131,8 @@ export default function ProgressPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
             <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Mark Days Complete</h2>
             <div className="flex gap-3 text-xs text-slate-500">
-              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span>Done</span>
-              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500/40 inline-block border border-blue-500/40"></span>Entry exists</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-cyan-500 inline-block"></span>Marked Done</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500/60 inline-block border border-emerald-500/40"></span>Has Entry</span>
               <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-slate-700 inline-block"></span>Pending</span>
             </div>
           </div>
@@ -119,25 +143,37 @@ export default function ProgressPage() {
               {Array.from({ length: total }, (_, i) => i + 1).map((day) => {
                 const isDone = completed.includes(day);
                 const hasEntry = entryDays.has(day);
+                const entry = entries.find(e => e.day === day);
                 return (
-                  <button
-                    key={day}
-                    onClick={() => toggleDay(day)}
-                    title={hasEntry ? `Day ${day} — entry logged` : `Day ${day}`}
-                    className={`aspect-square rounded-lg text-xs font-semibold flex items-center justify-center border transition-all duration-150 ${
-                      isDone
-                        ? "bg-cyan-500/20 border-cyan-500 text-cyan-300"
-                        : hasEntry
-                        ? "bg-slate-900/80 border-cyan-500/15 text-cyan-200 hover:border-cyan-300"
-                        : "bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-400"
-                    }`}
-                  >
-                    {day}
-                  </button>
+                  <div key={day} className="group relative">
+                    <button
+                      onClick={() => toggleDay(day)}
+                      title={hasEntry ? `Day ${day} — ${entry?.topic || "entry logged"}` : `Day ${day}`}
+                      className={`aspect-square rounded-lg text-xs font-semibold flex items-center justify-center border transition-all duration-150 w-full ${
+                        isDone
+                          ? "bg-cyan-500/20 border-cyan-500 text-cyan-300"
+                          : hasEntry
+                          ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-200 hover:border-emerald-500 hover:bg-emerald-500/25"
+                          : "bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-400"
+                      }`}
+                    >
+                      {day}
+                    </button>
+                    {/* Tooltip on hover */}
+                    {hasEntry && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                        <div className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs text-slate-300 whitespace-nowrap">
+                          {entry?.topic}
+                          {entry?.subtopic && ` → ${entry.subtopic}`}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
           )}
+          <p className="text-xs text-slate-500 mt-3">💡 Days with entries are auto-marked with <span className="text-emerald-400">green highlight</span></p>
         </div>
 
         {/* Save Button */}
@@ -158,6 +194,7 @@ export default function ProgressPage() {
             <><Save size={18} /> Save Progress</>
           )}
         </button>
+        {error && <p className="mt-3 text-sm text-rose-400">{error}</p>}
 
         {/* Entry-wise Log */}
         {entries.length > 0 && (
