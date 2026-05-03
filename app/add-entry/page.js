@@ -11,6 +11,10 @@ export default function AddEntry() {
     topic: "",
     subtopic: "",
     notes: "",
+    timeSpent: "",
+    difficulty: "medium",
+    mood: "neutral",
+    tags: "",
     date: new Date().toISOString().split("T")[0],
   });
   const [existingTopics, setExistingTopics] = useState([]);
@@ -44,12 +48,17 @@ export default function AddEntry() {
       const res = await fetch("/api/entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, day: Number(form.day) }),
+        body: JSON.stringify({
+          ...form,
+          day: Number(form.day),
+          timeSpent: Number(form.timeSpent) || 0,
+          tags: form.tags ? form.tags.split(",").map(tag => tag.trim()) : []
+        }),
       });
       const data = await res.json();
       if (data.success) {
         setStatus("success");
-        setForm({ day: "", topic: "", subtopic: "", notes: "", date: new Date().toISOString().split("T")[0] });
+        setForm({ day: "", topic: "", subtopic: "", notes: "", timeSpent: "", difficulty: "medium", mood: "neutral", tags: "", date: new Date().toISOString().split("T")[0] });
         setTimeout(() => router.push("/"), 1200);
       } else {
         setStatus("error");
@@ -69,15 +78,15 @@ export default function AddEntry() {
           <p className="text-slate-400 text-sm">Log what you learned today</p>
         </div>
 
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6">
+        <div className="glass-panel p-6">
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Day Number */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">
                   Day Number <span className="text-red-400">*</span>
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="number"
                     name="day"
@@ -135,7 +144,7 @@ export default function AddEntry() {
                       key={t}
                       type="button"
                       onClick={() => setForm({ ...form, topic: t })}
-                      className="px-2 py-0.5 bg-slate-700 hover:bg-emerald-500/20 hover:text-emerald-400 text-slate-400 rounded text-xs transition-colors border border-slate-600 hover:border-emerald-500/40"
+                      className="px-2 py-0.5 bg-slate-900/80 hover:bg-cyan-500/15 text-cyan-200 rounded-full text-xs font-semibold transition-colors border border-cyan-500/10 hover:border-cyan-400/30"
                     >
                       {t}
                     </button>
@@ -170,14 +179,72 @@ export default function AddEntry() {
               />
             </div>
 
+            {/* Time Spent and Difficulty */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">Time Spent (minutes)</label>
+                <input
+                  type="number"
+                  name="timeSpent"
+                  min="0"
+                  value={form.timeSpent}
+                  onChange={handleChange}
+                  placeholder="e.g. 60"
+                  className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-sm placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">Difficulty</label>
+                <select
+                  name="difficulty"
+                  value={form.difficulty}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Mood and Tags */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">Mood</label>
+                <select
+                  name="mood"
+                  value={form.mood}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-sm focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="frustrated">Frustrated</option>
+                  <option value="neutral">Neutral</option>
+                  <option value="satisfied">Satisfied</option>
+                  <option value="excited">Excited</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">Tags</label>
+                <input
+                  type="text"
+                  name="tags"
+                  value={form.tags}
+                  onChange={handleChange}
+                  placeholder="e.g. tutorial, project, review"
+                  className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 text-sm placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
             {/* Status */}
             {status === "success" && (
-              <div className="flex items-center gap-2 text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-2.5 text-sm">
+              <div className="flex items-center gap-2 text-cyan-200 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl px-4 py-2.5 text-sm">
                 <CheckCircle size={16} /> Entry saved! Redirecting...
               </div>
             )}
             {status === "error" && (
-              <div className="flex items-center gap-2 text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-2.5 text-sm">
+              <div className="flex items-center gap-2 text-red-300 bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-2.5 text-sm">
                 <AlertCircle size={16} /> Something went wrong. Try again.
               </div>
             )}
@@ -185,7 +252,7 @@ export default function AddEntry() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors"
+              className="w-full flex items-center justify-center gap-2 py-3 btn-primary disabled:opacity-70 disabled:cursor-not-allowed"
             >
               <PlusCircle size={18} />
               {submitting ? "Saving..." : "Save Entry"}

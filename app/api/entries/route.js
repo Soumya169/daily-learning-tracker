@@ -30,13 +30,23 @@ export async function POST(request) {
   try {
     await connectDB();
     const body = await request.json();
-    const { day, topic, subtopic, notes, date } = body;
+    const { day, topic, subtopic, notes, date, timeSpent, difficulty, mood, tags } = body;
 
     if (!day || !topic) {
       return NextResponse.json({ success: false, error: "Day and Topic are required" }, { status: 400 });
     }
 
-    const entry = await Entry.create({ day, topic, subtopic, notes, date: date || new Date() });
+    const entry = await Entry.create({
+      day,
+      topic,
+      subtopic: subtopic || "",
+      notes: notes || "",
+      date: date || new Date(),
+      timeSpent: timeSpent || 0,
+      difficulty: difficulty || "medium",
+      mood: mood || "neutral",
+      tags: tags || []
+    });
     return NextResponse.json({ success: true, data: entry }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

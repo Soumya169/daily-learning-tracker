@@ -59,14 +59,14 @@ export default function ProgressPage() {
   return (
     <>
       <Navbar />
-      <main className="max-w-3xl mx-auto px-4 py-10">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-slate-100 mb-1">Progress Tracker</h1>
-          <p className="text-slate-400 text-sm">Manage your challenge and mark days complete</p>
+      <main className="max-w-3xl mx-auto px-4 py-6 md:py-8">
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-100 mb-1">Progress Tracker</h1>
+          <p className="text-slate-400 text-xs md:text-sm">Manage your challenge and mark days complete</p>
         </div>
 
         {/* Challenge Selector */}
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 mb-6">
+        <div className="glass-panel p-4 md:p-6 mb-6">
           <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">Challenge Type</h2>
           <div className="flex gap-3">
             {[30, 45].map((type) => (
@@ -75,8 +75,8 @@ export default function ProgressPage() {
                 onClick={() => setChallenge(type)}
                 className={`flex-1 py-3 rounded-xl font-bold text-lg border-2 transition-all ${
                   progress.challengeType === type
-                    ? "border-emerald-500 bg-emerald-500/10 text-emerald-400"
-                    : "border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-600"
+                    ? "border-cyan-500 bg-cyan-500/10 text-cyan-300"
+                    : "border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-500"
                 }`}
               >
                 {type} Days
@@ -86,13 +86,13 @@ export default function ProgressPage() {
         </div>
 
         {/* Summary */}
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 mb-6">
-          <div className="flex items-center justify-between mb-3">
+        <div className="glass-panel p-4 md:p-6 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
             <div className="flex items-center gap-2">
-              <Trophy className="text-yellow-400" size={18} />
+              <Trophy className="text-cyan-300" size={18} />
               <span className="font-semibold text-slate-200">{completed.length} / {total} Days Completed</span>
             </div>
-            <span className="text-emerald-400 font-bold">{pct}%</span>
+            <span className="text-cyan-300 font-bold">{pct}%</span>
           </div>
           <div className="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
             <div
@@ -103,8 +103,8 @@ export default function ProgressPage() {
         </div>
 
         {/* Day Grid */}
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="glass-panel p-4 md:p-6 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
             <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Mark Days Complete</h2>
             <div className="flex gap-3 text-xs text-slate-500">
               <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span>Done</span>
@@ -126,9 +126,9 @@ export default function ProgressPage() {
                     title={hasEntry ? `Day ${day} — entry logged` : `Day ${day}`}
                     className={`aspect-square rounded-lg text-xs font-semibold flex items-center justify-center border transition-all duration-150 ${
                       isDone
-                        ? "bg-emerald-500/20 border-emerald-500 text-emerald-300"
+                        ? "bg-cyan-500/20 border-cyan-500 text-cyan-300"
                         : hasEntry
-                        ? "bg-blue-500/10 border-blue-500/30 text-blue-400 hover:border-emerald-500"
+                        ? "bg-slate-900/80 border-cyan-500/15 text-cyan-200 hover:border-cyan-300"
                         : "bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-400"
                     }`}
                   >
@@ -144,10 +144,10 @@ export default function ProgressPage() {
         <button
           onClick={saveProgress}
           disabled={saving}
-          className={`w-full flex items-center justify-center gap-2 py-3 font-semibold rounded-xl transition-all ${
+          className={`w-full flex items-center justify-center gap-2 py-3 font-semibold rounded-3xl transition-all ${
             saved
-              ? "bg-emerald-700 text-white"
-              : "bg-emerald-600 hover:bg-emerald-500 text-white"
+              ? "bg-cyan-500 text-slate-950"
+              : "btn-primary text-white"
           } disabled:opacity-60`}
         >
           {saving ? (
@@ -161,12 +161,12 @@ export default function ProgressPage() {
 
         {/* Entry-wise Log */}
         {entries.length > 0 && (
-          <div className="mt-8 bg-slate-800/60 border border-slate-700/50 rounded-2xl p-6">
+          <div className="mt-8 glass-panel p-6">
             <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">Days with Entries</h2>
             <div className="space-y-2">
               {entries.map((e) => (
                 <div key={e._id} className="flex items-center gap-3 text-sm">
-                  <span className="w-12 text-center py-0.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded text-xs font-bold">D{e.day}</span>
+                  <span className="w-12 text-center py-0.5 bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 rounded text-xs font-bold">D{e.day}</span>
                   <span className="text-slate-300 font-medium">{e.topic}</span>
                   {e.subtopic && <span className="text-slate-500">→ {e.subtopic}</span>}
                   <span className="ml-auto text-slate-600 text-xs">{new Date(e.date).toLocaleDateString("en-IN")}</span>
