@@ -51,7 +51,33 @@ export default function ProgressPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(progress),
       });
-      const data = await res.json();
+      
+      // Check if response is OK
+      if (!res.ok) {
+        setError(`Server error: ${res.status} ${res.statusText}`);
+        setSaving(false);
+        return;
+      }
+
+      // Get response text first to debug
+      const text = await res.text();
+      if (!text) {
+        setError("Empty response from server");
+        setSaving(false);
+        return;
+      }
+
+      // Parse JSON
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        console.error("JSON parse error:", parseErr, "Response:", text);
+        setError("Invalid response format from server");
+        setSaving(false);
+        return;
+      }
+
       if (data.success) {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
@@ -60,6 +86,7 @@ export default function ProgressPage() {
         setError(data.error || "Unable to save progress.");
       }
     } catch (err) {
+      console.error("Save error:", err);
       setError(err.message || "Unable to save progress.");
     } finally {
       setSaving(false);
