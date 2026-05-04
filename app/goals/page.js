@@ -1,22 +1,46 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Navbar from "@/components/Navbar";
-import { Target, Plus, CheckSquare, Square, Edit2, Trash2, Save, X, Calendar, Trophy } from "lucide-react";
+import {
+  AlertCircle,
+  Calendar,
+  Check,
+  ClipboardList,
+  Edit2,
+  Flag,
+  Plus,
+  Save,
+  Target,
+  Trash2,
+  Trophy,
+  X,
+} from "lucide-react";
+
+const blankGoal = {
+  title: "",
+  description: "",
+  targetDays: "",
+  category: "",
+  priority: "medium",
+  startDate: new Date().toISOString().split("T")[0],
+  endDate: "",
+};
+
+const priorityTone = {
+  low: "goal-priority-low",
+  medium: "goal-priority-medium",
+  high: "goal-priority-high",
+};
 
 export default function GoalsPage() {
   const [goals, setGoals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState(null);
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    targetDays: "",
-    category: "",
-    priority: "medium",
-    startDate: new Date().toISOString().split("T")[0],
-    endDate: "",
-  });
+  const [saving, setSaving] = useState(false);
+  const [togglingDay, setTogglingDay] = useState("");
+  const [error, setError] = useState("");
+  const [form, setForm] = useState(blankGoal);
 
   useEffect(() => {
     fetchGoals();
@@ -24,365 +48,411 @@ export default function GoalsPage() {
 
   async function fetchGoals() {
     setLoading(true);
+    setError("");
     try {
-      const res = await fetch("/api/goals");
+      const res = await fetch("/api/goals", { cache: "no-store" });
       const data = await res.json();
-      if (data.success) setGoals(data.data);
-    } catch (e) {
-      console.error(e);
+      if (!res.ok || !data.success) throw new Error(data.error || "Unable to load goals.");
+      setGoals(data.data || []);
+    } catch (err) {
+      setError(err.message || "Unable to load goals.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
-  async function saveGoal() {
+  function resetForm() {
+    setForm(blankGoal);
+    setEditingGoal(null);
+    setShowForm(false);
+    setError("");
+  }
+
+  function openCreateForm() {
+    setForm(blankGoal);
+    setEditingGoal(null);
+    setShowForm(true);
+    setError("");
+  }
+
+  function openEditForm(goal) {
+    setEditingGoal(goal);
+    setForm({
+      title: goal.title || "",
+      description: goal.description || "",
+      targetDays: String(goal.targetDays || ""),
+      category: goal.category || "",
+      priority: goal.priority || "medium",
+      startDate: goal.startDate ? new Date(goal.startDate).toISOString().split("T")[0] : blankGoal.startDate,
+      endDate: goal.endDate ? new Date(goal.endDate).toISOString().split("T")[0] : "",
+    });
+    setShowForm(true);
+    setError("");
+  }
+
+  async function saveGoal(e) {
+    e.preventDefault();
+    const targetDays = Number(form.targetDays);
+    if (!form.title.trim() || !Number.isInteger(targetDays) || targetDays < 1) {
+      setError("Add a goal title and a positive target day count.");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
     try {
       const method = editingGoal ? "PUT" : "POST";
       const url = editingGoal ? `/api/goals/${editingGoal._id}` : "/api/goals";
+      const payload = {
+        ...form,
+        title: form.title.trim(),
+        category: form.category.trim(),
+        description: form.description.trim(),
+        targetDays,
+      };
 
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          targetDays: Number(form.targetDays),
-        }),
+        body: JSON.stringify(payload),
       });
-
       const data = await res.json();
-      if (data.success) {
-        setShowForm(false);
-        setEditingGoal(null);
-        setForm({
-          title: "",
-          description: "",
-          targetDays: "",
-          category: "",
-          priority: "medium",
-          startDate: new Date().toISOString().split("T")[0],
-          endDate: "",
-        });
-        fetchGoals();
-      }
-    } catch (e) {
-      console.error(e);
+      if (!res.ok || !data.success) throw new Error(data.error || "Unable to save goal.");
+
+      resetForm();
+      await fetchGoals();
+    } catch (err) {
+      setError(err.message || "Unable to save goal right now.");
+    } finally {
+      setSaving(false);
     }
   }
 
   async function deleteGoal(id) {
     if (!confirm("Delete this goal?")) return;
-    await fetch(`/api/goals/${id}`, { method: "DELETE" });
-    fetchGoals();
+    setError("");
+    try {
+      const res = await fetch(`/api/goals/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Unable to delete goal.");
+      await fetchGoals();
+    } catch (err) {
+      setError(err.message || "Unable to delete goal.");
+    }
   }
 
-  function toggleDay(goalId, day) {
-    const goal = goals.find(g => g._id === goalId);
+  async function toggleDay(goal, day) {
+    const key = `${goal._id}-${day}`;
     const completedDays = goal.completedDays || [];
     const updated = completedDays.includes(day)
-      ? completedDays.filter(d => d !== day)
+      ? completedDays.filter((d) => d !== day)
       : [...completedDays, day];
 
-    fetch(`/api/goals/${goalId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ completedDays: updated }),
-    }).then(() => fetchGoals());
+    setTogglingDay(key);
+    setError("");
+    try {
+      const res = await fetch(`/api/goals/${goal._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completedDays: updated }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Unable to update goal.");
+      setGoals((current) => current.map((item) => (item._id === goal._id ? data.data : item)));
+    } catch (err) {
+      setError(err.message || "Unable to update goal.");
+    } finally {
+      setTogglingDay("");
+    }
   }
 
-  const activeGoals = goals.filter(g => g.status === "active");
-  const completedGoals = goals.filter(g => g.status === "completed");
+  const stats = useMemo(() => {
+    const active = goals.filter((goal) => goal.status !== "completed");
+    const completed = goals.filter((goal) => goal.status === "completed");
+    const markedDays = goals.reduce((sum, goal) => sum + (goal.completedDays?.length || 0), 0);
+    return { active, completed, markedDays };
+  }, [goals]);
 
   return (
     <>
       <Navbar />
-      <main className="max-w-6xl mx-auto px-4 py-6 md:py-8">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 md:mb-8">
-          <div className="mb-4 sm:mb-0">
-            <h1 className="text-2xl md:text-3xl font-bold text-slate-100 mb-1">Learning Goals</h1>
-            <p className="text-slate-400">Set and track multiple learning challenges</p>
+      <main className="page-shell">
+        <section className="goal-hero">
+          <div>
+            <p className="section-heading">Challenge board</p>
+            <h1 className="goal-title">Choose the promises you can see every day.</h1>
+            <p className="goal-copy">
+              Keep each learning challenge small enough to touch, clear enough to finish, and visible enough to believe.
+            </p>
           </div>
-          <button
-            onClick={() => setShowForm(true)}
-            className="btn-primary flex items-center gap-2"
-          >
+          <button onClick={openCreateForm} className="btn-primary goal-new-button">
             <Plus size={18} />
             New Goal
           </button>
-        </div>
+        </section>
 
-        {/* Goal Form */}
+        <section className="goal-strip" aria-label="Goal summary">
+          <SummaryTile icon={<Target size={18} />} label="Active" value={stats.active.length} />
+          <SummaryTile icon={<Check size={18} />} label="Marked Days" value={stats.markedDays} />
+          <SummaryTile icon={<Trophy size={18} />} label="Finished" value={stats.completed.length} />
+        </section>
+
+        {error && (
+          <div className="goal-alert">
+            <AlertCircle size={16} />
+            {error}
+          </div>
+        )}
+
         {showForm && (
-          <div className="glass-panel p-6 mb-8">
-            <h2 className="text-xl font-semibold text-slate-100 mb-4">
-              {editingGoal ? "Edit Goal" : "Create New Goal"}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <form onSubmit={saveGoal} className="goal-form">
+            <div className="goal-form-header">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Title *</label>
+                <p className="section-heading">{editingGoal ? "Refine challenge" : "New challenge"}</p>
+                <h2>{editingGoal ? "Edit your goal" : "Create a visible target"}</h2>
+              </div>
+              <button type="button" onClick={resetForm} className="icon-button" aria-label="Close goal form">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="goal-form-grid">
+              <Field label="Title" required>
                 <input
-                  type="text"
+                  className="input-field"
                   value={form.title}
-                  onChange={e => setForm({...form, title: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200"
-                  placeholder="e.g. Learn React in 30 days"
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  placeholder="DSA streak, React fundamentals, English speaking..."
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Target Days *</label>
+              </Field>
+              <Field label="Target Days" required>
                 <input
+                  className="input-field"
                   type="number"
-                  value={form.targetDays}
-                  onChange={e => setForm({...form, targetDays: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200"
-                  placeholder="30"
                   min="1"
+                  max="365"
+                  value={form.targetDays}
+                  onChange={(e) => setForm({ ...form, targetDays: e.target.value })}
+                  placeholder="30"
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Category</label>
+              </Field>
+              <Field label="Category">
                 <input
-                  type="text"
+                  className="input-field"
                   value={form.category}
-                  onChange={e => setForm({...form, category: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200"
-                  placeholder="e.g. Programming, Design"
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  placeholder="Programming, aptitude, language..."
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Priority</label>
+              </Field>
+              <Field label="Priority">
                 <select
+                  className="input-field"
                   value={form.priority}
-                  onChange={e => setForm({...form, priority: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200"
+                  onChange={(e) => setForm({ ...form, priority: e.target.value })}
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
                 </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Start Date</label>
+              </Field>
+              <Field label="Start Date">
                 <input
+                  className="input-field"
                   type="date"
                   value={form.startDate}
-                  onChange={e => setForm({...form, startDate: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200"
+                  onChange={(e) => setForm({ ...form, startDate: e.target.value })}
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">End Date (Optional)</label>
+              </Field>
+              <Field label="End Date">
                 <input
+                  className="input-field"
                   type="date"
                   value={form.endDate}
-                  onChange={e => setForm({...form, endDate: e.target.value})}
-                  className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200"
+                  onChange={(e) => setForm({ ...form, endDate: e.target.value })}
                 />
-              </div>
+              </Field>
             </div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-slate-300 mb-1">Description</label>
+
+            <Field label="Why this matters">
               <textarea
+                className="input-field goal-textarea"
                 value={form.description}
-                onChange={e => setForm({...form, description: e.target.value})}
-                rows={3}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-slate-200 resize-none"
-                placeholder="Describe your goal and what you hope to achieve..."
+                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="One sentence that reminds you why this challenge is worth finishing."
               />
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={saveGoal}
-                className="btn-primary flex items-center gap-2"
-              >
+            </Field>
+
+            <div className="goal-form-actions">
+              <button type="submit" disabled={saving} className="btn-primary">
                 <Save size={16} />
-                {editingGoal ? "Update" : "Create"} Goal
+                {saving ? "Saving..." : editingGoal ? "Update Goal" : "Create Goal"}
               </button>
-              <button
-                onClick={() => {
-                  setShowForm(false);
-                  setEditingGoal(null);
-                  setForm({
-                    title: "",
-                    description: "",
-                    targetDays: "",
-                    category: "",
-                    priority: "medium",
-                    startDate: new Date().toISOString().split("T")[0],
-                    endDate: "",
-                  });
-                }}
-                className="btn-secondary flex items-center gap-2"
-              >
+              <button type="button" onClick={resetForm} className="btn-secondary">
                 <X size={16} />
                 Cancel
               </button>
             </div>
-          </div>
+          </form>
         )}
 
-        {/* Active Goals */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-slate-100 mb-4 flex items-center gap-2">
-            <Target size={20} className="text-emerald-400" />
-            Active Goals ({activeGoals.length})
-          </h2>
-          {loading ? (
-            <div className="text-center py-8 text-slate-500">Loading goals...</div>
-          ) : activeGoals.length === 0 ? (
-            <div className="text-center py-8">
-              <Target size={40} className="mx-auto mb-3 text-slate-600" />
-              <p className="text-slate-500">No active goals yet. Create your first goal!</p>
+        <section className="goal-section">
+          <div className="goal-section-heading">
+            <div>
+              <p className="section-heading">In progress</p>
+              <h2>Active goals</h2>
             </div>
+            <span>{stats.active.length}</span>
+          </div>
+
+          {loading ? (
+            <div className="goal-empty">Loading your goals...</div>
+          ) : stats.active.length === 0 ? (
+            <EmptyState onCreate={openCreateForm} />
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {activeGoals.map(goal => (
+            <div className="goal-list">
+              {stats.active.map((goal) => (
                 <GoalCard
                   key={goal._id}
                   goal={goal}
+                  togglingDay={togglingDay}
                   onToggleDay={toggleDay}
-                  onEdit={() => {
-                    setEditingGoal(goal);
-                    setForm({
-                      title: goal.title,
-                      description: goal.description || "",
-                      targetDays: goal.targetDays,
-                      category: goal.category || "",
-                      priority: goal.priority || "medium",
-                      startDate: new Date(goal.startDate).toISOString().split("T")[0],
-                      endDate: goal.endDate ? new Date(goal.endDate).toISOString().split("T")[0] : "",
-                    });
-                    setShowForm(true);
-                  }}
-                  onDelete={() => deleteGoal(goal._id)}
+                  onEdit={openEditForm}
+                  onDelete={deleteGoal}
                 />
               ))}
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Completed Goals */}
-        {completedGoals.length > 0 && (
-          <div>
-            <h2 className="text-xl font-semibold text-slate-100 mb-4 flex items-center gap-2">
-              <Trophy size={20} className="text-yellow-400" />
-              Completed Goals ({completedGoals.length})
-            </h2>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {completedGoals.map(goal => (
+        {stats.completed.length > 0 && (
+          <section className="goal-section">
+            <div className="goal-section-heading">
+              <div>
+                <p className="section-heading">Evidence</p>
+                <h2>Completed goals</h2>
+              </div>
+              <span>{stats.completed.length}</span>
+            </div>
+            <div className="goal-list">
+              {stats.completed.map((goal) => (
                 <GoalCard
                   key={goal._id}
                   goal={goal}
+                  togglingDay={togglingDay}
                   onToggleDay={toggleDay}
-                  onEdit={() => {
-                    setEditingGoal(goal);
-                    setForm({
-                      title: goal.title,
-                      description: goal.description || "",
-                      targetDays: goal.targetDays,
-                      category: goal.category || "",
-                      priority: goal.priority || "medium",
-                      startDate: new Date(goal.startDate).toISOString().split("T")[0],
-                      endDate: goal.endDate ? new Date(goal.endDate).toISOString().split("T")[0] : "",
-                    });
-                    setShowForm(true);
-                  }}
-                  onDelete={() => deleteGoal(goal._id)}
+                  onEdit={openEditForm}
+                  onDelete={deleteGoal}
                 />
               ))}
             </div>
-          </div>
+          </section>
         )}
       </main>
     </>
   );
 }
 
-function GoalCard({ goal, onToggleDay, onEdit, onDelete }) {
-  const completedCount = goal.completedDays?.length || 0;
-  const progressPct = Math.min(Math.round((completedCount / goal.targetDays) * 100), 100);
-  const isCompleted = completedCount >= goal.targetDays;
+function SummaryTile({ icon, label, value }) {
+  return (
+    <div className="summary-tile">
+      <div>{icon}</div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
 
-  const priorityColors = {
-    low: "text-blue-400 bg-blue-500/20",
-    medium: "text-yellow-400 bg-yellow-500/20",
-    high: "text-red-400 bg-red-500/20"
-  };
+function Field({ label, required, children }) {
+  return (
+    <label className="goal-field">
+      <span>
+        {label}
+        {required && <b>*</b>}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function EmptyState({ onCreate }) {
+  return (
+    <div className="goal-empty">
+      <ClipboardList size={36} />
+      <h3>No active goals yet</h3>
+      <p>Create one challenge you can check every day.</p>
+      <button onClick={onCreate} className="btn-primary">
+        <Plus size={16} />
+        Create Goal
+      </button>
+    </div>
+  );
+}
+
+function GoalCard({ goal, togglingDay, onToggleDay, onEdit, onDelete }) {
+  const completedDays = goal.completedDays || [];
+  const targetDays = Math.max(Number(goal.targetDays) || 1, 1);
+  const completedCount = completedDays.length;
+  const progressPct = Math.min(Math.round((completedCount / targetDays) * 100), 100);
+  const isCompleted = goal.status === "completed" || completedCount >= targetDays;
+  const daysLeft = Math.max(targetDays - completedCount, 0);
+  const startDate = goal.startDate ? new Date(goal.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "No start";
+  const endDate = goal.endDate ? new Date(goal.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "Open";
 
   return (
-    <div className={`bg-slate-800/60 border rounded-xl p-6 ${isCompleted ? 'border-yellow-500/30' : 'border-slate-700/50'}`}>
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-2">
-            <h3 className="text-lg font-semibold text-slate-100">{goal.title}</h3>
-            {isCompleted && <Trophy size={16} className="text-yellow-400" />}
-          </div>
-          {goal.description && (
-            <p className="text-slate-400 text-sm mb-3">{goal.description}</p>
-          )}
-          <div className="flex items-center gap-3 mb-3">
-            {goal.category && (
-              <span className="text-xs bg-slate-700 text-slate-400 px-2 py-1 rounded">
-                {goal.category}
-              </span>
-            )}
-            <span className={`text-xs px-2 py-1 rounded ${priorityColors[goal.priority || 'medium']}`}>
-              {goal.priority || 'medium'} priority
-            </span>
+    <article className={`goal-card ${isCompleted ? "goal-card-done" : ""}`}>
+      <div className="goal-card-top">
+        <div className="goal-icon">
+          {isCompleted ? <Trophy size={18} /> : <Flag size={18} />}
+        </div>
+        <div className="goal-card-title">
+          <h3>{goal.title}</h3>
+          <div className="goal-meta">
+            {goal.category && <span>{goal.category}</span>}
+            <span className={priorityTone[goal.priority || "medium"]}>{goal.priority || "medium"} priority</span>
           </div>
         </div>
-        <div className="flex gap-1">
-          <button onClick={onEdit} className="p-1.5 text-slate-500 hover:text-slate-300 hover:bg-slate-700 rounded-lg">
-            <Edit2 size={14} />
+        <div className="goal-actions">
+          <button onClick={() => onEdit(goal)} className="icon-button" aria-label={`Edit ${goal.title}`}>
+            <Edit2 size={15} />
           </button>
-          <button onClick={onDelete} className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg">
-            <Trash2 size={14} />
+          <button onClick={() => onDelete(goal._id)} className="icon-button danger" aria-label={`Delete ${goal.title}`}>
+            <Trash2 size={15} />
           </button>
         </div>
       </div>
 
-      {/* Progress */}
-      <div className="mb-4">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-sm text-slate-400">Progress</span>
-          <span className="text-sm font-medium text-slate-200">{completedCount}/{goal.targetDays} days</span>
-        </div>
-        <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden mb-2">
-          <div
-            className={`h-2 rounded-full transition-all duration-500 ${
-              isCompleted ? 'bg-yellow-500' : 'bg-emerald-500'
-            }`}
-            style={{ width: `${progressPct}%` }}
-          />
-        </div>
-        <div className="text-right text-xs text-slate-500">{progressPct}% complete</div>
+      {goal.description && <p className="goal-description">{goal.description}</p>}
+
+      <div className="goal-facts">
+        <span><Calendar size={14} /> {startDate} to {endDate}</span>
+        <span>{daysLeft === 0 ? "Finished" : `${daysLeft} days left`}</span>
       </div>
 
-      {/* Day Grid */}
-      <div>
-        <div className="text-sm text-slate-400 mb-2">Mark days complete:</div>
-        <div className="grid grid-cols-7 gap-1">
-          {Array.from({ length: Math.min(goal.targetDays, 35) }, (_, i) => i + 1).map(day => {
-            const isDone = goal.completedDays?.includes(day);
-            return (
-              <button
-                key={day}
-                onClick={() => onToggleDay(goal._id, day)}
-                className={`aspect-square rounded text-xs font-semibold flex items-center justify-center border transition-all ${
-                  isDone
-                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                    : 'bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500'
-                }`}
-              >
-                {day}
-              </button>
-            );
-          })}
-        </div>
-        {goal.targetDays > 35 && (
-          <div className="text-xs text-slate-500 mt-2">
-            Showing first 35 days of {goal.targetDays} total days
-          </div>
-        )}
+      <div className="goal-progress-row">
+        <strong>{completedCount}/{targetDays}</strong>
+        <span>{progressPct}% complete</span>
       </div>
-    </div>
+      <div className="goal-progress-track">
+        <div style={{ width: `${progressPct}%` }} />
+      </div>
+
+      <div className="goal-day-grid" style={{ "--goal-days": Math.min(targetDays, 12) }}>
+        {Array.from({ length: targetDays }, (_, i) => i + 1).map((day) => {
+          const isDone = completedDays.includes(day);
+          const key = `${goal._id}-${day}`;
+          return (
+            <button
+              key={day}
+              onClick={() => onToggleDay(goal, day)}
+              disabled={togglingDay === key}
+              title={`Day ${day}`}
+              className={isDone ? "done" : ""}
+            >
+              {isDone ? <Check size={13} /> : day}
+            </button>
+          );
+        })}
+      </div>
+    </article>
   );
 }

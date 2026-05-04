@@ -32,31 +32,33 @@ export async function POST(request) {
     await connectDB();
     const body = await request.json();
     const { day, topic, subtopic, notes, date, timeSpent, difficulty, mood, tags } = body;
+    const normalizedDay = Number(day);
 
-    if (!day || !topic) {
+    if (!Number.isInteger(normalizedDay) || normalizedDay < 1 || !topic?.trim()) {
       return NextResponse.json({ success: false, error: "Day and Topic are required" }, { status: 400 });
     }
 
     const entry = await Entry.create({
-      day,
-      topic,
+      day: normalizedDay,
+      topic: topic.trim(),
       subtopic: subtopic || "",
       notes: notes || "",
       date: date || new Date(),
-      timeSpent: timeSpent || 0,
+      timeSpent: Math.max(Number(timeSpent) || 0, 0),
       difficulty: difficulty || "medium",
       mood: mood || "neutral",
-      tags: tags || []
+      tags: Array.isArray(tags) ? tags.filter(Boolean) : [],
     });
 
     const progress = await Progress.findOne();
     if (progress) {
-      if (!progress.completedDays.includes(day)) {
-        progress.completedDays.push(day);
+      if (!progress.completedDays.includes(normalizedDay)) {
+        progress.completedDays.push(normalizedDay);
+        progress.completedDays.sort((a, b) => a - b);
         await progress.save();
       }
     } else {
-      await Progress.create({ challengeType: 30, completedDays: [day] });
+      await Progress.create({ challengeType: 30, completedDays: [normalizedDay] });
     }
 
     return NextResponse.json({ success: true, data: entry }, { status: 201 });

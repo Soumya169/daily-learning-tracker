@@ -1,7 +1,8 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
-import { Flame, CheckCircle2, Trophy, BookOpen, ChevronRight, Search, Filter, Trash2, Edit2, X, Save } from "lucide-react";
+import { Flame, CheckCircle2, Trophy, BookOpen, ChevronRight, Search, Filter, Trash2, Edit2, X, Save, CalendarDays, Clock3, ArrowRight } from "lucide-react";
 
 export default function Dashboard() {
   const [entries, setEntries] = useState([]);
@@ -19,16 +20,25 @@ export default function Dashboard() {
   async function fetchAll() {
     setLoading(true);
     try {
-      const [eRes, pRes] = await Promise.all([
-        fetch("/api/entries"),
-        fetch("/api/progress"),
-      ]);
-      const eData = await eRes.json();
-      const pData = await pRes.json();
-      if (eData.success) setEntries(eData.data);
-      if (pData.success) setProgress(pData.data);
+      // Fetch progress first
+      const pRes = await fetch("/api/progress");
+      if (pRes.ok) {
+        const pData = await pRes.json();
+        if (pData.success) {
+          setProgress(pData.data);
+        }
+      }
+
+      // Fetch entries
+      const eRes = await fetch("/api/entries");
+      if (eRes.ok) {
+        const eData = await eRes.json();
+        if (eData.success) {
+          setEntries(eData.data);
+        }
+      }
     } catch (e) {
-      console.error(e);
+      console.error('Fetch error:', e);
     }
     setLoading(false);
   }
@@ -67,14 +77,44 @@ export default function Dashboard() {
   const completedCount = progress.completedDays?.length || 0;
   const challengeTotal = progress.challengeType || 30;
   const progressPct = Math.min(Math.round((completedCount / challengeTotal) * 100), 100);
+  const todayKey = new Date().toISOString().split("T")[0];
+  const todaysEntries = entries.filter((entry) => new Date(entry.date).toISOString().split("T")[0] === todayKey);
+  const latestEntry = entries[entries.length - 1];
+  const nextDay = Math.max(0, ...entries.map((entry) => Number(entry.day) || 0)) + 1;
+  const suggestedTopic = latestEntry?.topic || "";
+  const lastSevenDays = new Set(
+    Array.from({ length: 7 }, (_, index) => {
+      const date = new Date();
+      date.setDate(date.getDate() - index);
+      return date.toISOString().split("T")[0];
+    })
+  );
+  const recentEntries = entries.filter((entry) => lastSevenDays.has(new Date(entry.date).toISOString().split("T")[0]));
+  const recentMinutes = recentEntries.reduce((sum, entry) => sum + (entry.timeSpent || 0), 0);
+  const activeDays = new Set(recentEntries.map((entry) => new Date(entry.date).toISOString().split("T")[0])).size;
+  const weeklyConsistency = Math.round((activeDays / 7) * 100);
+  const addEntryHref = `/add-entry?day=${nextDay}${suggestedTopic ? `&topic=${encodeURIComponent(suggestedTopic)}` : ""}`;
 
-  // Calculate streak
-  const sortedDays = [...(progress.completedDays || [])].sort((a, b) => b - a);
-  let streak = 0;
-  for (let i = 0; i < sortedDays.length; i++) {
-    if (i === 0 || sortedDays[i] === sortedDays[i - 1] - 1) streak++;
-    else break;
+  // Calculate streak (longest consecutive streak)
+  const days = progress.completedDays || [];
+  let longestStreak = 0;
+  let currentStreak = 0;
+  
+  if (days.length > 0) {
+    const sortedDays = [...days].sort((a, b) => a - b); // ascending order
+    
+    for (let i = 0; i < sortedDays.length; i++) {
+      if (i === 0 || sortedDays[i] === sortedDays[i - 1] + 1) {
+        currentStreak++;
+        longestStreak = Math.max(longestStreak, currentStreak);
+      } else {
+        currentStreak = 1; // reset to 1 for this single day
+        longestStreak = Math.max(longestStreak, currentStreak);
+      }
+    }
   }
+  
+  const streak = longestStreak;
 
   return (
     <>
@@ -87,6 +127,27 @@ export default function Dashboard() {
           </p>
         </div>
 
+        <section className="today-focus-panel mb-6 md:mb-8">
+          <div className="today-focus-main">
+            <p className="section-heading">Today&apos;s focus</p>
+            <h1>{todaysEntries.length > 0 ? "Today is already recorded." : "Make today visible."}</h1>
+            <p>
+              {todaysEntries.length > 0
+                ? `${todaysEntries.length} session${todaysEntries.length === 1 ? "" : "s"} logged today. Keep the proof chain alive.`
+                : `Suggested next entry: Day ${nextDay}${suggestedTopic ? `, continue ${suggestedTopic}` : ""}.`}
+            </p>
+            <Link href={addEntryHref} className="btn-primary">
+              {todaysEntries.length > 0 ? "Add another session" : "Log today's work"}
+              <ArrowRight size={16} />
+            </Link>
+          </div>
+          <div className="today-focus-grid">
+            <FocusMetric icon={<CalendarDays size={18} />} label="7-day consistency" value={`${weeklyConsistency}%`} />
+            <FocusMetric icon={<Clock3 size={18} />} label="Recent minutes" value={`${recentMinutes}m`} />
+            <FocusMetric icon={<BookOpen size={18} />} label="Next day" value={`D${nextDay}`} />
+          </div>
+        </section>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 md:mb-8">
           <StatCard
@@ -98,9 +159,9 @@ export default function Dashboard() {
           />
           <StatCard
             icon={<Flame className="text-violet-300" size={20} />}
-            label="Current Streak"
+            label="Best Streak"
             value={`${streak} day${streak !== 1 ? "s" : ""}`}
-            sub="keep it up!"
+            sub="longest consecutive"
             color="violet"
           />
           <StatCard
@@ -289,6 +350,16 @@ export default function Dashboard() {
         .input-field:focus { border-color: #10b981; }
       `}</style>
     </>
+  );
+}
+
+function FocusMetric({ icon, label, value }) {
+  return (
+    <div className="focus-metric">
+      <div>{icon}</div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
 

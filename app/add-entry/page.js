@@ -20,6 +20,7 @@ export default function AddEntry() {
   const [existingTopics, setExistingTopics] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState(null); // 'success' | 'error'
+  const [errorMessage, setErrorMessage] = useState("");
   const [syncMessage, setSyncMessage] = useState("");
   const [nextDay, setNextDay] = useState(1);
 
@@ -36,15 +37,33 @@ export default function AddEntry() {
       });
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const day = params.get("day");
+    const topic = params.get("topic");
+    if (!day && !topic) return;
+
+    setForm((current) => ({
+      ...current,
+      day: day && Number(day) > 0 ? day : current.day,
+      topic: topic || current.topic,
+    }));
+  }, []);
+
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!form.day || !form.topic) return;
+    if (!form.day || Number(form.day) < 1 || !form.topic.trim()) {
+      setStatus("error");
+      setErrorMessage("Add a valid day number and topic before saving.");
+      return;
+    }
     setSubmitting(true);
     setStatus(null);
+    setErrorMessage("");
     setSyncMessage("");
     try {
       const res = await fetch("/api/entries", {
@@ -65,9 +84,11 @@ export default function AddEntry() {
         setTimeout(() => router.push("/dashboard"), 1500);
       } else {
         setStatus("error");
+        setErrorMessage(data.error || "Something went wrong. Try again.");
       }
     } catch {
       setStatus("error");
+      setErrorMessage("Unable to save right now. Check your connection and try again.");
     }
     setSubmitting(false);
   }
@@ -255,7 +276,7 @@ export default function AddEntry() {
             )}
             {status === "error" && (
               <div className="flex items-center gap-2 text-red-300 bg-red-500/10 border border-red-500/20 rounded-2xl px-4 py-2.5 text-sm">
-                <AlertCircle size={16} /> Something went wrong. Try again.
+                <AlertCircle size={16} /> {errorMessage || "Something went wrong. Try again."}
               </div>
             )}
 

@@ -140,7 +140,7 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-2xl md:text-4xl font-bold text-white mb-4">Ready to Start Your Learning Journey?</h2>
           <p className="text-emerald-100 mb-6 md:mb-8 text-sm md:text-base max-w-2xl mx-auto">
-            Join thousands of learners who are already tracking their progress and achieving their goals.
+            Build a visible record of what you complete each day, one focused session at a time.
           </p>
           <Link href="/dashboard" className="bg-white text-emerald-600 hover:bg-slate-100 px-6 md:px-8 py-3 md:py-4 rounded-xl font-semibold text-base md:text-lg transition-all duration-200 inline-flex items-center gap-2 group">
             Start Tracking Now

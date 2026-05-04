@@ -27,6 +27,8 @@ export default function AnalyticsPage() {
   const totalEntries = entries.length;
   const totalTime = entries.reduce((sum, entry) => sum + (entry.timeSpent || 0), 0);
   const avgTimePerSession = totalEntries > 0 ? Math.round(totalTime / totalEntries) : 0;
+  const longestSession = entries.length > 0 ? Math.max(...entries.map((e) => e.timeSpent || 0)) : 0;
+  const percent = (count) => (totalEntries > 0 ? `${Math.round((count / totalEntries) * 100)}%` : "0%");
 
   // Topic distribution
   const topicStats = entries.reduce((acc, entry) => {
@@ -118,7 +120,9 @@ export default function AnalyticsPage() {
               Top Topics
             </h2>
             <div className="space-y-3">
-              {topTopics.map(([topic, count], index) => (
+              {topTopics.length === 0 ? (
+                <EmptyMetric message="Add entries to see your strongest topics." />
+              ) : topTopics.map(([topic, count], index) => (
                 <div key={topic} className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className="w-6 h-6 bg-cyan-500/15 text-cyan-200 rounded-full flex items-center justify-center text-xs font-bold">
@@ -130,7 +134,7 @@ export default function AnalyticsPage() {
                     <div className="w-20 bg-slate-900 rounded-full h-2">
                       <div
                         className="bg-cyan-400 h-2 rounded-full"
-                        style={{ width: `${(count / totalEntries) * 100}%` }}
+                        style={{ width: percent(count) }}
                       />
                     </div>
                     <span className="text-slate-400 text-sm w-8 text-right">{count}</span>
@@ -165,7 +169,7 @@ export default function AnalyticsPage() {
                       <div className="w-16 bg-slate-700 rounded-full h-2">
                         <div
                           className={`h-2 rounded-full ${colors[level]}`}
-                          style={{ width: `${(count / totalEntries) * 100}%` }}
+                          style={{ width: percent(count) }}
                         />
                       </div>
                       <span className={`text-sm font-medium ${percentages[level]} w-12 text-right`}>
@@ -208,7 +212,7 @@ export default function AnalyticsPage() {
                       <div className="w-16 bg-slate-700 rounded-full h-2">
                         <div
                           className={`h-2 rounded-full ${colors[mood]}`}
-                          style={{ width: `${(count / totalEntries) * 100}%` }}
+                          style={{ width: percent(count) }}
                         />
                       </div>
                       <span className="text-slate-400 text-sm w-8 text-right">{count}</span>
@@ -226,7 +230,9 @@ export default function AnalyticsPage() {
               Weekly Activity
             </h2>
             <div className="space-y-3">
-              {recentWeeks.map(([week, count]) => (
+              {recentWeeks.length === 0 ? (
+                <EmptyMetric message="Weekly activity appears after your first saved entry." />
+              ) : recentWeeks.map(([week, count]) => (
                 <div key={week} className="flex items-center justify-between">
                   <span className="text-slate-200 text-sm">{week}</span>
                   <div className="flex items-center gap-2">
@@ -254,7 +260,7 @@ export default function AnalyticsPage() {
             />
             <InsightCard
               title="Longest Session"
-              value={`${Math.max(...entries.map(e => e.timeSpent || 0))} minutes`}
+              value={`${longestSession} minutes`}
               icon={<Clock className="text-blue-400" size={20} />}
             />
             <InsightCard
@@ -293,6 +299,14 @@ function InsightCard({ title, value, icon }) {
       </div>
       <p className="text-slate-100 font-semibold">{value}</p>
     </div>
+  );
+}
+
+function EmptyMetric({ message }) {
+  return (
+    <p className="rounded-lg border border-slate-700/70 bg-slate-900/60 px-3 py-4 text-sm text-slate-500">
+      {message}
+    </p>
   );
 }
 
