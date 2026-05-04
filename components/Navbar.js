@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BookOpen, LayoutDashboard, PlusCircle, BarChart2, TrendingUp, Target, Menu, X } from "lucide-react";
+import { BookOpen, LayoutDashboard, PlusCircle, BarChart2, TrendingUp, Target, Menu, X, Code2 } from "lucide-react";
 
 const navLinks = [
   { href: "/", label: "Home", icon: BookOpen },
@@ -11,6 +11,7 @@ const navLinks = [
   { href: "/progress-page", label: "Progress", icon: BarChart2 },
   { href: "/analytics", label: "Analytics", icon: TrendingUp },
   { href: "/goals", label: "Goals", icon: Target },
+  { href: "/leetcode", label: "LeetCode", icon: Code2 },
 ];
 
 export default function Navbar() {

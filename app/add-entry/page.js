@@ -41,12 +41,14 @@ export default function AddEntry() {
     const params = new URLSearchParams(window.location.search);
     const day = params.get("day");
     const topic = params.get("topic");
-    if (!day && !topic) return;
+    const subtopic = params.get("subtopic");
+    if (!day && !topic && !subtopic) return;
 
     setForm((current) => ({
       ...current,
       day: day && Number(day) > 0 ? day : current.day,
       topic: topic || current.topic,
+      subtopic: subtopic || current.subtopic,
     }));
   }, []);
 
